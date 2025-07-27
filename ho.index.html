@@ -1,0 +1,254 @@
+ <!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Old TV avec son</title>
+  <style>
+    body {
+      background: black;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      position: relative;
+    }
+    .tv-screen {
+      position: absolute;
+      width: 90vw;
+      height: 50vw;
+      background-image: url(https://alexandrevacassin.fr/codepen/old-tv/base.webp);
+      background-size: cover;
+      background-position: center center;
+      background-repeat: no-repeat;
+      z-index: 10;
+    }
+    .tv-container {
+      position: relative;
+      width: 60vw;
+      height: 45vw;
+      z-index: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+    iframe, #player {
+      width: 100%;
+      height: 100%;
+      filter: contrast(1.2) brightness(1.1);
+    }
+    .glitch, .scan-lines, .snow-effect {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .glitch {
+      background: url("https://upload.wikimedia.org/wikipedia/commons/0/02/Television_static.gif");
+      mix-blend-mode: multiply;
+      opacity: 0.3;
+      animation: glitchMove 0.2s infinite linear;
+    }
+    .scan-lines {
+      background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0px, rgba(0, 0, 0, 0.2) 1px, rgba(0, 0, 0, 0) 2px);
+    }
+    .snow-effect {
+      background: url("https://upload.wikimedia.org/wikipedia/commons/0/02/Television_static.gif");
+      background-size: cover;
+      opacity: 0;
+      transition: opacity 0.5s ease-in-out;
+      z-index: 3;
+    }
+    @keyframes glitchMove {
+      0% { transform: translateX(0); }
+      33% { transform: translateX(-5px); }
+      66% { transform: translateX(5px); }
+      100% { transform: translateX(0); }
+    }
+    canvas {
+      mix-blend-mode: screen;
+      position: absolute;
+      left: 0;
+      z-index: 9;
+      width: 100%;
+      height: 100%;
+    }
+    .controls {
+      z-index: 20;
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+    }
+    .controls button, .controls input[type="range"] {
+      padding: 10px;
+      font-size: 16px;
+      background: #111;
+      color: white;
+      border: 2px solid white;
+      cursor: pointer;
+    }
+    .controls input[type="range"] {
+      width: 150px;
+    }
+    .controls button:hover {
+      background: white;
+      color: black;
+    }
+  </style>
+</head>
+<body>
+  <div class="tv-screen"></div>
+  <div class="tv-container">
+    <canvas id="canvas"></canvas>
+    <div id="player"></div>
+    <div class="glitch"></div>
+    <div class="scan-lines"></div>
+    <div class="snow-effect"></div>
+  </div>
+
+  <div class="controls">
+    <button onclick="playVideo()">▶️ Lecture</button>
+    <button onclick="pauseVideo()">⏸️ Pause</button>
+    <input type="range" min="0" max="100" value="100" onchange="setVolume(this.value)" title="Volume">
+    <button onclick="toggleFullscreen()">⛶ Plein écran</button>
+  </div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script>
+    let player;
+
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('player', {
+        height: '100%',
+        width: '100%',
+        videoId: 'obveAVipZxM', // ID mis à jour ici
+        playerVars: {
+          autoplay: 0,
+          controls: 0,
+          loop: 1,
+          playlist: 'obveAVipZxM' // requis pour le loop
+        }
+      });
+    }
+
+    function playVideo() {
+      if (player && player.playVideo) player.playVideo();
+    }
+
+    function pauseVideo() {
+      if (player && player.pauseVideo) player.pauseVideo();
+    }
+
+    function setVolume(val) {
+      if (player && player.setVolume) player.setVolume(val);
+    }
+
+    function toggleFullscreen() {
+      const elem = document.querySelector(".tv-container");
+      if (!document.fullscreenElement) {
+        elem.requestFullscreen().catch(err => alert(`Erreur fullscreen : ${err.message}`));
+      } else {
+        document.exitFullscreen();
+      }
+    }
+
+    function getRandomInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    class VCREffect {
+      constructor(canvas, options = {}) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext("2d");
+        this.config = Object.assign({
+          fps: 60,
+          blur: 1,
+          opacity: 1,
+          miny: 220,
+          miny2: 220,
+          num: 70
+        }, options);
+        this.init();
+      }
+
+      init() {
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+        this.canvas.style.position = "absolute";
+        this.canvas.style.top = "0";
+        this.canvas.style.left = "0";
+        this.canvas.style.opacity = this.config.opacity;
+        this.generateVCRNoise();
+        window.addEventListener("resize", () => this.onResize());
+      }
+
+      onResize() {
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+      }
+
+      generateVCRNoise() {
+        if (this.config.fps >= 60) {
+          cancelAnimationFrame(this.vcrInterval);
+          const animate = () => {
+            this.renderTrackingNoise();
+            this.vcrInterval = requestAnimationFrame(animate);
+          };
+          animate();
+        } else {
+          clearInterval(this.vcrInterval);
+          this.vcrInterval = setInterval(() => {
+            this.renderTrackingNoise();
+          }, 1000 / this.config.fps);
+        }
+      }
+
+      renderTrackingNoise(radius = 2) {
+        const ctx = this.ctx;
+        const canvas = this.canvas;
+        const config = this.config;
+        let { miny, miny2, num } = config;
+        canvas.style.filter = `blur(${config.blur}px)`;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        for (let i = 0; i <= num; i++) {
+          let x = Math.random() * canvas.width;
+          let y1 = getRandomInt(miny += 3, canvas.height);
+          let y2 = getRandomInt(0, miny2 -= 3);
+          ctx.fillRect(x, y1, radius, radius);
+          ctx.fillRect(x, y2, radius, radius);
+          ctx.fill();
+          this.renderTail(ctx, x, y1, radius);
+          this.renderTail(ctx, x, y2, radius);
+        }
+        ctx.closePath();
+      }
+
+      renderTail(ctx, x, y, radius) {
+        const n = getRandomInt(1, 50);
+        const dirs = [1, -1];
+        let dir = dirs[Math.floor(Math.random() * dirs.length)];
+        for (let i = 0; i < n; i++) {
+          let r = getRandomInt(radius - 0.01, radius);
+          let dx = getRandomInt(1, 4) * dir;
+          radius -= 0.1;
+          ctx.fillRect((x += dx), y, r, r);
+          ctx.fill();
+        }
+      }
+    }
+
+    const canvas = document.getElementById("canvas");
+    new VCREffect(canvas);
+  </script>
+</body>
+</html>
